@@ -6,6 +6,8 @@ import android.graphics.Color;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.*;
+import android.speech.tts.TextToSpeech;
+import java.util.Locale;
 
 public class MainActivity extends Activity {
 
@@ -14,6 +16,8 @@ public class MainActivity extends Activity {
     private EditText apiInput;
     private TextView status;
     private String apiKey = "";
+    private TextToSpeech textToSpeech;
+    private boolean ttsReady = false;
 
     private int dp(float value) {
         return (int) (value * getResources().getDisplayMetrics().density);
@@ -30,6 +34,19 @@ public class MainActivity extends Activity {
         }
 
         buildInterface();
+        initializeTextToSpeech();
+    }
+
+    private void initializeTextToSpeech() {
+        textToSpeech = new TextToSpeech(this, result -> {
+            if (result == TextToSpeech.SUCCESS) {
+                int languageResult = textToSpeech.setLanguage(new Locale("bn", "BD"));
+                if (languageResult == TextToSpeech.LANG_MISSING_DATA || languageResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    languageResult = textToSpeech.setLanguage(new Locale("bn"));
+                }
+                ttsReady = languageResult != TextToSpeech.LANG_MISSING_DATA && languageResult != TextToSpeech.LANG_NOT_SUPPORTED;
+            }
+        });
     }
 
     private void buildInterface() {
@@ -165,6 +182,12 @@ public class MainActivity extends Activity {
         chatLayout.addView(bubble, params);
     }
 
+    private void speakText(String text) {
+        if (textToSpeech != null && ttsReady) {
+            textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null, "AWN_RESPONSE");
+        }
+    }
+
     private void sendMessage() {
         String prompt = messageInput.getText().toString().trim();
 
@@ -189,6 +212,7 @@ public class MainActivity extends Activity {
                     chatLayout.removeViewAt(chatLayout.getChildCount() - 1);
                     addMessage("AWN", answer,
                         Color.rgb(0, 220, 190));
+                    speakText(answer);
                     status.setText("GEMINI AI READY");
                 }
 
@@ -199,5 +223,14 @@ public class MainActivity extends Activity {
                     status.setText("CONNECTION ERROR");
                 }
             });
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (textToSpeech != null) {
+            textToSpeech.stop();
+            textToSpeech.shutdown();
+        }
+        super.onDestroy();
     }
 }
