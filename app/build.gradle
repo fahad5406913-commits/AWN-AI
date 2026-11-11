@@ -19,3 +19,7 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 }
+
+dependencies {
+    implementation 'com.github.msnilsen:openwakeword-android:0.1.0'
+}
