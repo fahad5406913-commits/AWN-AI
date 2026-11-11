@@ -7,6 +7,10 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.*;
 import android.speech.tts.TextToSpeech;
+import android.speech.RecognizerIntent;
+import android.content.Intent;
+import android.speech.SpeechRecognizer;
+import android.content.pm.PackageManager;
 import java.util.Locale;
 
 public class MainActivity extends Activity {
@@ -18,6 +22,8 @@ public class MainActivity extends Activity {
     private String apiKey = "";
     private TextToSpeech textToSpeech;
     private boolean ttsReady = false;
+    private static final int REQUEST_SPEECH = 1001;
+    private boolean isListening = false;
 
     private int dp(float value) {
         return (int) (value * getResources().getDisplayMetrics().density);
@@ -125,12 +131,17 @@ public class MainActivity extends Activity {
         messageInput.setPadding(dp(12), dp(8), dp(12), dp(8));
         messageInput.setBackgroundColor(Color.rgb(35, 43, 60));
 
+        Button mic = new Button(this);
+        mic.setText("MIC");
+        mic.setOnClickListener(v -> startVoiceInput());
+
         Button send = new Button(this);
         send.setText("SEND");
         send.setOnClickListener(v -> sendMessage());
 
         inputPanel.addView(messageInput,
             new LinearLayout.LayoutParams(0, dp(55), 1));
+        inputPanel.addView(mic);
         inputPanel.addView(send);
 
         root.addView(title);
@@ -145,6 +156,59 @@ public class MainActivity extends Activity {
         status.setText(apiKey.isEmpty()
             ? "API KEY REQUIRED"
             : "GEMINI AI READY");
+    }
+
+    private void startVoiceInput() {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Toast.makeText(this, "Speech recognition is not available", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        if (checkSelfPermission("android.permission.RECORD_AUDIO") != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{"android.permission.RECORD_AUDIO"}, REQUEST_SPEECH);
+            return;
+        }
+
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD");
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "bn-BD");
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "কথা বলুন...");
+
+        try {
+            startActivityForResult(intent, REQUEST_SPEECH);
+        } catch (Exception e) {
+            Toast.makeText(this, "Voice input could not start", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == REQUEST_SPEECH) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startVoiceInput();
+            } else {
+                Toast.makeText(this, "Microphone permission is required", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == REQUEST_SPEECH && resultCode == RESULT_OK && data != null) {
+            java.util.ArrayList<String> results =
+                data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+
+            if (results != null && !results.isEmpty()) {
+                messageInput.setText(results.get(0));
+                messageInput.setSelection(messageInput.getText().length());
+                sendMessage();
+            }
+        }
     }
 
     private void saveApiKey() {
