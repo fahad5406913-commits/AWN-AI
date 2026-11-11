@@ -20,6 +20,8 @@ import android.speech.tts.UtteranceProgressListener;
 import android.widget.*;
 import java.util.Locale;
 import java.util.ArrayList;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class MainActivity extends Activity {
 
@@ -271,13 +273,15 @@ public class MainActivity extends Activity {
         scroll.setBackground(bg("#10192A", "#0C1423", 18));
         scroll.addView(chatLayout);
 
-        TextView welcome = text(
-            "Hello! I am AWN.\nYour personal AI assistant.",
-            16, "#8CEBFF"
-        );
-        welcome.setGravity(Gravity.CENTER);
-        welcome.setPadding(dp(12), dp(30), dp(12), dp(30));
-        chatLayout.addView(welcome);
+        if (!loadChatHistory(chatLayout)) {
+            TextView welcome = text(
+                "Hello! I am AWN.\nYour personal AI assistant.",
+                16, "#8CEBFF"
+            );
+            welcome.setGravity(Gravity.CENTER);
+            welcome.setPadding(dp(12), dp(30), dp(12), dp(30));
+            chatLayout.addView(welcome);
+        }
 
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
@@ -570,6 +574,7 @@ public class MainActivity extends Activity {
 
         if (showInChat && targetChat != null) {
             addMessage(targetChat, "YOU", prompt, "#FFFFFF");
+            saveChatHistory("YOU", prompt);
             addMessage(targetChat, "AWN", "Thinking...", "#54DFFF");
         }
 
@@ -599,6 +604,7 @@ public class MainActivity extends Activity {
                             int last = targetChat.getChildCount() - 1;
                             if (last >= 0) targetChat.removeViewAt(last);
                             addMessage(targetChat, "AWN", answer, "#70E7FF");
+                            saveChatHistory("AWN", answer);
                         }
 
                         if (faceView != null) faceView.setMode("talking");
@@ -634,6 +640,62 @@ public class MainActivity extends Activity {
             new LinearLayout.LayoutParams(-1, -2);
         p.setMargins(0, dp(5), 0, dp(5));
         target.addView(bubble, p);
+    }
+
+    private void saveChatHistory(String label, String message) {
+        try {
+            android.content.SharedPreferences prefs =
+                getSharedPreferences("awn_chat_history", MODE_PRIVATE);
+
+            JSONArray history = new JSONArray(
+                prefs.getString("messages", "[]")
+            );
+
+            JSONObject item = new JSONObject();
+            item.put("label", label);
+            item.put("message", message);
+            history.put(item);
+
+            JSONArray limited = new JSONArray();
+            int start = Math.max(0, history.length() - 100);
+
+            for (int i = start; i < history.length(); i++) {
+                limited.put(history.getJSONObject(i));
+            }
+
+            prefs.edit().putString("messages", limited.toString()).apply();
+        } catch (Exception e) {
+            android.util.Log.e("AWN", "Could not save chat history", e);
+        }
+    }
+
+    private boolean loadChatHistory(LinearLayout target) {
+        try {
+            android.content.SharedPreferences prefs =
+                getSharedPreferences("awn_chat_history", MODE_PRIVATE);
+
+            JSONArray history = new JSONArray(
+                prefs.getString("messages", "[]")
+            );
+
+            if (history.length() == 0) return false;
+
+            for (int i = 0; i < history.length(); i++) {
+                JSONObject item = history.getJSONObject(i);
+                String label = item.getString("label");
+                String message = item.getString("message");
+
+                String textColor = label.equals("YOU")
+                    ? "#FFFFFF" : "#70E7FF";
+
+                addMessage(target, label, message, textColor);
+            }
+
+            return true;
+        } catch (Exception e) {
+            android.util.Log.e("AWN", "Could not load chat history", e);
+            return false;
+        }
     }
 
     private void speakText(String value) {
