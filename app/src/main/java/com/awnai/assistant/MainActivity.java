@@ -40,6 +40,7 @@ public class MainActivity extends Activity {
     private boolean ttsReady = false;
 
     private static final int REQUEST_SPEECH = 1001;
+    private static final int REQUEST_WAKE_PERMISSION = 1002;
 
     private int dp(float value) {
         return (int)(value * getResources().getDisplayMetrics().density);
@@ -357,6 +358,14 @@ public class MainActivity extends Activity {
         saveKey.setOnClickListener(v -> saveApiKey());
         panel.addView(saveKey);
 
+        panel.addView(section("HEY JARVIS WAKE WORD"));
+        addSettingAction(panel, "START HEY JARVIS",
+            "Enable background wake word listening",
+            () -> startWakeWordService());
+        addSettingAction(panel, "STOP HEY JARVIS",
+            "Turn off wake word listening",
+            () -> stopWakeWordService());
+
         panel.addView(section("ANDROID PERMISSIONS"));
 
         addSettingAction(panel, "MICROPHONE PERMISSION",
@@ -415,6 +424,28 @@ public class MainActivity extends Activity {
         p.bottomMargin = dp(9);
         e.setLayoutParams(p);
         return e;
+    }
+
+    private void startWakeWordService() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                new String[]{Manifest.permission.RECORD_AUDIO},
+                REQUEST_WAKE_PERMISSION
+            );
+            return;
+        }
+
+        Intent intent = new Intent(this, WakeWordService.class);
+        startForegroundService(intent);
+        Toast.makeText(this, "Hey Jarvis listening started",
+            Toast.LENGTH_SHORT).show();
+    }
+
+    private void stopWakeWordService() {
+        stopService(new Intent(this, WakeWordService.class));
+        Toast.makeText(this, "Hey Jarvis listening stopped",
+            Toast.LENGTH_SHORT).show();
     }
 
     private void addSettingAction(LinearLayout panel, String title,
@@ -510,6 +541,17 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode,
             String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == REQUEST_WAKE_PERMISSION) {
+            if (grantResults.length > 0 &&
+                grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startWakeWordService();
+            } else {
+                Toast.makeText(this, "Microphone permission required",
+                    Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
 
         if (requestCode == REQUEST_SPEECH) {
             if (grantResults.length > 0 &&
