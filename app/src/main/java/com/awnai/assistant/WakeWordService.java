@@ -8,6 +8,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
+import android.util.Log;
 
 import com.openwakeword.OpenWakeWord;
 
@@ -37,8 +38,30 @@ public class WakeWordService extends Service {
                     .setDebounceMs(2500L)
                     .build();
 
-                detector.start(score -> showDetectedNotification());
+                detector.start(score -> {
+                    Log.d("AWN_WAKE", "Wake word detected, score=" + score);
+                    showDetectedNotification();
+                });
+                NotificationManager manager =
+                    getSystemService(NotificationManager.class);
+                manager.notify(NOTIFICATION_ID,
+                    new Notification.Builder(this, CHANNEL_ID)
+                        .setContentTitle("AWN AI")
+                        .setContentText("Hey Jarvis model loaded")
+                        .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+                        .setOngoing(true)
+                        .build());
             } catch (Exception e) {
+                Log.e("AWN_WAKE", "Wake word startup failed", e);
+                NotificationManager manager =
+                    getSystemService(NotificationManager.class);
+                manager.notify(NOTIFICATION_ID,
+                    new Notification.Builder(this, CHANNEL_ID)
+                        .setContentTitle("AWN AI - Wake Word Error")
+                        .setContentText(e.getClass().getSimpleName() + ": " + e.getMessage())
+                        .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                        .setOngoing(true)
+                        .build());
                 stopSelf();
             }
         }
